@@ -51,15 +51,20 @@ public sealed class PlayerBleat : MonoBehaviour
         if (LastHeardGroup != null)
         {
             LastHeardGroup.HearBleat(transform);
+            Bleated?.Invoke(LastHeardGroup);
         }
         else
         {
-            // Nothing close enough to walk over: still let the nearest far flock answer quietly,
-            // otherwise the opening call reads as broken silence.
-            DistantGroup = SheepGroupController.FindNearestDistant(transform.position);
-            if (DistantGroup != null) DistantGroup.HearDistantBleat(transform);
+            // Each audible flock offers its own answer and direction, so the opening has a choice.
+            var groups = SheepGroupController.FindAllDistantInRange(transform.position);
+            foreach (var group in groups)
+            {
+                if (DistantGroup == null) DistantGroup = group;
+                group.HearDistantBleat(transform);
+                Bleated?.Invoke(group);
+            }
+            if (groups.Count == 0) Bleated?.Invoke(null);
         }
-        Bleated?.Invoke(LastHeardGroup != null ? LastHeardGroup : DistantGroup);
         return true;
     }
 

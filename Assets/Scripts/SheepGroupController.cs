@@ -113,11 +113,22 @@ public class SheepGroupController : MonoBehaviour
         return nearest;
     }
 
+    /// <summary>All audible flocks offer directions when the player has nobody nearby.</summary>
+    public static List<SheepGroupController> FindAllDistantInRange(Vector2 position)
+    {
+        var groups = new List<SheepGroupController>();
+        foreach (var group in ActiveGroups)
+            if (group.isActiveAndEnabled && group.CanAnswer && group.DistanceTo(position) <= group.distantHearingRadius)
+                groups.Add(group);
+        groups.Sort((a, b) => a.DistanceTo(position).CompareTo(b.DistanceTo(position)));
+        return groups;
+    }
+
     /// <summary>
     /// The flock is too far to react properly, but the player should still hear that someone is out
     /// there: one or two sheep answer quietly, after a pause, without moving.
     /// </summary>
-    public void HearDistantBleat(Transform player)
+    public virtual void HearDistantBleat(Transform player)
     {
         if (!CanAnswer) return;
         if (player == null || DistanceTo(player.position) > distantHearingRadius) return;
