@@ -15,14 +15,16 @@ public sealed class DividedGroup : SheepGroupController
     [SerializeField, Min(0f)] private float departureInterval = 2.5f;
     [SerializeField, Min(0f)] private float lookingDuration = 1.1f;
     [SerializeField, Min(0f)] private float flockCallReactionDelay = 0.35f;
+    [SerializeField, Min(1)] private int minimumFlockCallers = 5;
+    [SerializeField, Min(1)] private int maximumFlockCallers = 7;
     [SerializeField, Min(0f)] private float recallResponseDelay = 0.3f;
     [SerializeField, Min(0f)] private float recallPauseDuration = 1.1f;
     [SerializeField, Min(0f)] private float answerDelay = 0.8f;
     [SerializeField, Min(0f)] private float answerCooldown = 2f;
     [Tooltip("Distance at which approaching the separated flock triggers avoidance.")]
-    [SerializeField, Min(0f)] private float avoidanceDistance = 8f;
+    [SerializeField, Min(0f)] private float avoidanceDistance = 5f;
     [SerializeField, Min(0f)] private float avoidanceStepDistance = 4f;
-    [SerializeField, Min(0f)] private float retreatSpeed = 1.8f;
+    [SerializeField, Min(0f)] private float retreatSpeed = 4.2f;
     [SerializeField] private Vector2 pastureMin = new Vector2(-37f, -27f);
     [SerializeField] private Vector2 pastureMax = new Vector2(37f, 27f);
 
@@ -41,6 +43,7 @@ public sealed class DividedGroup : SheepGroupController
     private bool hasAnswered;
     private Coroutine answer;
     private Coroutine recall;
+    private Coroutine flockCall;
     private bool recallUsed;
     private float recallPauseUntil;
     private Transform recallCaller;
@@ -252,29 +255,50 @@ public sealed class DividedGroup : SheepGroupController
             else
             {
                 departing = true;
-                departureCaller = CallCompanionBack(responsiveSheep[returnedCount]);
                 responsiveSheep[returnedCount].StopMoving();
-                departureStarted = Time.time + flockCallReactionDelay;
+                departureStarted = float.PositiveInfinity;
+                departureCaller = null;
                 recallUsed = false;
                 recallPauseUntil = 0f;
                 recallCaller = null;
+                flockCall = StartCoroutine(CallCompanionBack(responsiveSheep[returnedCount]));
             }
         }
     }
 
-    private Transform CallCompanionBack(SheepAgent companion)
+    private IEnumerator CallCompanionBack(SheepAgent companion)
     {
-        SheepAgent caller = null;
-        float nearest = float.PositiveInfinity;
+        var callers = new List<SheepAgent>();
         foreach (var sheep in majority)
+            if (sheep != null && sheep.isActiveAndEnabled) callers.Add(sheep);
+        for (int i = 0; i < returnedCount; i++)
+            if (responsiveSheep[i] != null && responsiveSheep[i].isActiveAndEnabled)
+                callers.Add(responsiveSheep[i]);
+
+        // Different voices overlap a little, rather than chanting together or repeating one sheep.
+        for (int i = callers.Count - 1; i > 0; i--)
         {
-            if (sheep == null || !sheep.isActiveAndEnabled) continue;
-            float distance = ((Vector2)sheep.transform.position - (Vector2)companion.transform.position).sqrMagnitude;
-            if (distance < nearest) { nearest = distance; caller = sheep; }
+            int other = Random.Range(0, i + 1);
+            var swap = callers[i];
+            callers[i] = callers[other];
+            callers[other] = swap;
         }
-        if (caller == null) return null;
-        caller.RespondTo(companion.transform.position);
-        return caller.transform;
+        int minimum = Mathf.Max(1, minimumFlockCallers);
+        int count = Mathf.Min(callers.Count, Random.Range(minimum, Mathf.Max(minimum, maximumFlockCallers) + 1));
+        for (int i = 0; i < count; i++)
+        {
+            if (companion == null || !departing) break;
+            if (callers[i] != null && callers[i].isActiveAndEnabled)
+            {
+                callers[i].RespondTo(companion.transform.position);
+                departureCaller = callers[i].transform;
+            }
+            yield return new WaitForSeconds(Random.Range(0.16f, 0.3f));
+        }
+        yield return new WaitForSeconds(0.45f);
+        // One round releases exactly one companion; the next round waits for its reunion.
+        departureStarted = Time.time + flockCallReactionDelay;
+        flockCall = null;
     }
 
     private void MoveMajority()
@@ -283,7 +307,9 @@ public sealed class DividedGroup : SheepGroupController
         {
             if (majority[i] == null) continue;
             if (CurrentPhase == Phase.Separating && Time.time - phaseStarted < i * 0.14f) continue;
-            majority[i].MoveTo(ClampToPasture(flockCenter + majorityOffsets[i]));
+            Vector2 target = ClampToPasture(flockCenter + majorityOffsets[i]);
+            if (avoidingPlayer) majority[i].MoveTo(target, retreatSpeed);
+            else majority[i].MoveTo(target);
         }
     }
 
@@ -375,7 +401,10 @@ public sealed class DividedGroup : SheepGroupController
 
     private void MoveReturnedSheep(int index)
     {
-        if (responsiveSheep[index] != null) responsiveSheep[index].MoveTo(ReturnSlot(index));
+        if (responsiveSheep[index] == null) return;
+        bool rejoined = index < returnedCount || CurrentPhase == Phase.Silent;
+        if (avoidingPlayer && rejoined) responsiveSheep[index].MoveTo(ReturnSlot(index), retreatSpeed);
+        else responsiveSheep[index].MoveTo(ReturnSlot(index));
     }
 
     private Vector2 ClampToPasture(Vector2 point) => new Vector2(
@@ -396,6 +425,9 @@ public sealed class DividedGroup : SheepGroupController
         answer = null;
         if (recall != null) StopCoroutine(recall);
         recall = null;
+        if (flockCall != null) StopCoroutine(flockCall);
+        flockCall = null;
+        if (float.IsPositiveInfinity(departureStarted)) departureStarted = Time.time + flockCallReactionDelay;
         recallPauseUntil = 0f;
         recallCaller = null;
         base.OnDisable();

@@ -19,13 +19,18 @@ public sealed class PlayerController : MonoBehaviour
     private Vector2 escapeDirection = Vector2.down;
     private float exclusionRadius;
     private float escapeSpeed;
+    private Object positionOwner;
+    private Vector2 fixedPosition;
 
     public Vector2 MoveInput { get; private set; }
     public InputAction BleatAction { get { PrepareInput(); return bleatAction; } }
     public bool HasGroupExclusion => exclusionOwner != null;
+    public Vector2 PhysicsPosition => body != null ? body.position : (Vector2)transform.position;
+    public Vector2 RequestedVelocity => positionOwner == null ? MoveInput * moveSpeed : Vector2.zero;
 
     private void Awake()
     {
+        if (GetComponent<PauseMenu>() == null) gameObject.AddComponent<PauseMenu>();
         body = GetComponent<Rigidbody2D>();
         visual = GetComponent<SpriteRenderer>();
         PrepareInput();
@@ -49,14 +54,34 @@ public sealed class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        MoveInput = moveAction == null ? Vector2.zero : Vector2.ClampMagnitude(moveAction.ReadValue<Vector2>(), 1f);
+        MoveInput = PauseMenu.IsPaused || positionOwner != null || moveAction == null ? Vector2.zero : Vector2.ClampMagnitude(moveAction.ReadValue<Vector2>(), 1f);
         if (Mathf.Abs(MoveInput.x) > 0.01f) visual.flipX = MoveInput.x < 0f;
     }
 
     private void FixedUpdate()
     {
+        if (positionOwner != null)
+        {
+            body.linearVelocity = Vector2.zero;
+            body.MovePosition(Vector2.MoveTowards(body.position, fixedPosition, 5f * Time.fixedDeltaTime));
+            return;
+        }
         Vector2 velocity = Time.time < pushUntil ? pushVelocity : MoveInput * moveSpeed;
         body.linearVelocity = ConstrainGroupEntry(velocity);
+    }
+
+    public void HoldPosition(Object owner, Vector2 position)
+    {
+        positionOwner = owner;
+        fixedPosition = position;
+        pushUntil = 0f;
+    }
+
+    public void ReleasePosition(Object owner)
+    {
+        if (positionOwner != owner) return;
+        positionOwner = null;
+        if (body != null) body.linearVelocity = Vector2.zero;
     }
 
     public void SetGroupExclusion(Object owner, Vector2 center, float radius, Vector2 fallbackDirection, float outwardSpeed)
@@ -109,6 +134,7 @@ public sealed class PlayerController : MonoBehaviour
         MoveInput = Vector2.zero;
         pushUntil = 0f;
         exclusionOwner = null;
+        positionOwner = null;
         if (body != null) body.linearVelocity = Vector2.zero;
     }
 

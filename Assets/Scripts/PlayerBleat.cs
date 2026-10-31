@@ -9,6 +9,7 @@ public sealed class PlayerBleat : MonoBehaviour
     [SerializeField] private AudioClip bleatClip;
     [SerializeField, Min(0.01f)] private float cooldown = 0.25f;
     [SerializeField, Range(0f, 1f)] private float volume = 0.6f;
+    [SerializeField, Range(0f, 1f)] private float rhythmVolume = 0.16f;
 
     private InputAction action;
     private AudioSource voice;
@@ -16,11 +17,14 @@ public sealed class PlayerBleat : MonoBehaviour
     private Color originalColor;
     private float nextBleatTime;
     private Coroutine feedback;
+    private UnityEngine.Object rhythmOwner;
 
     public int BleatCount { get; private set; }
     public SheepGroupController LastHeardGroup { get; private set; }
     public SheepGroupController DistantGroup { get; private set; }
     public event Action<SheepGroupController> Bleated;
+    // Once per actual player call, independent of how many distant flocks answer.
+    public event Action<double> Called;
 
     private void Awake()
     {
@@ -37,20 +41,49 @@ public sealed class PlayerBleat : MonoBehaviour
 
     private void OnBleatInput(InputAction.CallbackContext context) => TryBleat();
 
+    public void SetRhythmVoice(UnityEngine.Object owner, bool enabled)
+    {
+        if (enabled)
+        {
+            rhythmOwner = owner;
+            RhythmBleat.GetClip(bleatClip);
+        }
+        else if (rhythmOwner == owner) rhythmOwner = null;
+    }
+
     public bool TryBleat()
     {
-        if (!isActiveAndEnabled || Time.time < nextBleatTime) return false;
+        if (!isActiveAndEnabled || PauseMenu.IsPaused || Time.time < nextBleatTime) return false;
+        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) return false;
         nextBleatTime = Time.time + cooldown;
         BleatCount++;
-        if (bleatClip != null) voice.PlayOneShot(bleatClip, volume);
-        if (feedback != null) StopCoroutine(feedback);
-        feedback = StartCoroutine(ShowFeedback());
-
+        double calledAt = AudioSettings.dspTime;
         LastHeardGroup = SheepGroupController.FindNearestInRange(transform.position);
         DistantGroup = null;
+        var accepting = LastHeardGroup as AcceptingGroup;
+        bool shared = accepting != null && accepting.CanShareCall;
+        double voiceTime = shared ? calledAt + 0.06 : calledAt;
+        bool rhythmic = rhythmOwner != null;
+        if (shared)
+        {
+            float sharedVolume = accepting.PreparePlayerCall(voiceTime);
+            voice.Stop();
+            FlockCallVoice.For(gameObject).Play(bleatClip, voiceTime, sharedVolume);
+            BeatBounce.For(gameObject).PulseAt(voiceTime);
+        }
+        else
+        {
+            if (rhythmic) BeatBounce.For(gameObject).Pulse();
+            if (rhythmic) { voice.Stop(); voice.pitch = 1f; }
+            var clip = rhythmic ? RhythmBleat.GetClip(bleatClip) : bleatClip;
+            if (clip != null) voice.PlayOneShot(clip, rhythmic ? rhythmVolume : volume);
+        }
+        Called?.Invoke(calledAt);
+        if (feedback != null) StopCoroutine(feedback);
+        feedback = StartCoroutine(ShowFeedback(voiceTime));
         if (LastHeardGroup != null)
         {
-            LastHeardGroup.HearBleat(transform);
+            if (!shared) LastHeardGroup.HearBleat(transform);
             Bleated?.Invoke(LastHeardGroup);
         }
         else
@@ -68,10 +101,11 @@ public sealed class PlayerBleat : MonoBehaviour
         return true;
     }
 
-    private IEnumerator ShowFeedback()
+    private IEnumerator ShowFeedback(double time)
     {
-        visual.color = Color.Lerp(originalColor, Color.white, 0.65f);
-        yield return new WaitForSeconds(0.16f);
+        while (AudioSettings.dspTime < time) yield return null;
+        visual.color = new Color(1f, 0.82f, 0.42f, originalColor.a);
+        yield return new WaitForSeconds(0.2f);
         visual.color = originalColor;
         feedback = null;
     }
@@ -81,6 +115,7 @@ public sealed class PlayerBleat : MonoBehaviour
         if (action != null) action.performed -= OnBleatInput;
         if (feedback != null) StopCoroutine(feedback);
         feedback = null;
+        rhythmOwner = null;
         if (visual != null) visual.color = originalColor;
     }
 }

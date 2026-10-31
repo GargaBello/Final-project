@@ -13,9 +13,10 @@ public sealed class InteractionUI : MonoBehaviour
 
     private readonly List<SpriteRenderer> requestIcons = new List<SpriteRenderer>();
     private Transform iconRoot;
+    private readonly List<SpriteRenderer> carriedIcons = new List<SpriteRenderer>();
+    private Transform carriedRoot;
     private float openedAt;
     private GUIStyle hint;
-    private GUIStyle counter;
 
     private void Start()
     {
@@ -29,6 +30,7 @@ public sealed class InteractionUI : MonoBehaviour
 
     private void LateUpdate()
     {
+        UpdateCarriedFlowers();
         if (iconRoot == null || demandingGroup == null) return;
         bool show = demandingGroup.ShowRequest;
         iconRoot.gameObject.SetActive(show);
@@ -60,13 +62,47 @@ public sealed class InteractionUI : MonoBehaviour
         }
     }
 
+    private void UpdateCarriedFlowers()
+    {
+        if (inventory == null || flowerIcon == null)
+        {
+            if (carriedRoot != null) carriedRoot.gameObject.SetActive(false);
+            return;
+        }
+        if (carriedRoot == null)
+        {
+            if (inventory.Count == 0) return;
+            carriedRoot = new GameObject("CarriedFlowers").transform;
+            carriedRoot.SetParent(inventory.transform, false);
+        }
+        carriedRoot.gameObject.SetActive(inventory.Count > 0);
+        if (inventory.Count == 0) return;
+        while (carriedIcons.Count < inventory.Count)
+        {
+            var icon = new GameObject("CarriedFlower");
+            icon.transform.SetParent(carriedRoot, false);
+            var renderer = icon.AddComponent<SpriteRenderer>();
+            renderer.sprite = flowerIcon;
+            renderer.color = Color.white;
+            renderer.sortingOrder = 20001;
+            carriedIcons.Add(renderer);
+        }
+        carriedRoot.localPosition = Vector3.up * (1.05f + Mathf.Sin(Time.time * 2f) * 0.035f);
+        for (int i = 0; i < carriedIcons.Count; i++)
+        {
+            var icon = carriedIcons[i];
+            icon.gameObject.SetActive(i < inventory.Count);
+            icon.transform.localScale = Vector3.one * 0.65f;
+            icon.transform.localPosition = new Vector3((i - (inventory.Count - 1) * 0.5f) * 0.65f, 0f, 0f);
+        }
+    }
+
     private void OnGUI()
     {
         if (inventory == null || demandingGroup == null) return;
         if (hint == null)
         {
             hint = new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter };
-            counter = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleLeft };
         }
         Matrix4x4 oldMatrix = GUI.matrix;
         Color oldColor = GUI.color;
@@ -77,32 +113,21 @@ public sealed class InteractionUI : MonoBehaviour
 
         if (Time.time - openedAt < openingHintDuration)
             GUI.Label(new Rect(width * 0.5f - 180, height - 50, 360, 34), "WASD: Move    SPACE: Bleat", hint);
-        if (inventory.Count > 0)
-        {
-            DrawFlower(new Rect(20, 20, 32, 32));
-            GUI.Label(new Rect(62, 19, 70, 34), "x " + inventory.Count, counter);
-        }
         if (demandingGroup.State == SheepGroupController.GroupState.Refusing && demandingGroup.IsNearby)
             GUI.Label(new Rect(width * 0.5f - 180, height - 90, 360, 34), "No flowers left.", hint);
         GUI.color = oldColor;
         GUI.matrix = oldMatrix;
     }
 
-    private void DrawFlower(Rect rect)
-    {
-        if (flowerIcon == null) return;
-        Rect source = flowerIcon.rect;
-        Texture texture = flowerIcon.texture;
-        GUI.DrawTextureWithTexCoords(rect, texture, new Rect(source.x / texture.width, source.y / texture.height, source.width / texture.width, source.height / texture.height));
-    }
-
     private void OnDisable()
     {
         if (iconRoot != null) iconRoot.gameObject.SetActive(false);
+        if (carriedRoot != null) carriedRoot.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
     {
         if (iconRoot != null) Destroy(iconRoot.gameObject);
+        if (carriedRoot != null) Destroy(carriedRoot.gameObject);
     }
 }

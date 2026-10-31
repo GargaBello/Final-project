@@ -55,13 +55,13 @@ public sealed class BleatEchoIndicator : MonoBehaviour
 
         // The waves belong to the answer, not to the call: hold them back by the same pause.
         if (cueDelay > 0f) StartCoroutine(ShowAfterDelay(responder, cueDelay));
-        else ShowCueAt(responder.transform.position, answerAlpha);
+        else ShowCueAt(responder.AnswerPosition, answerAlpha);
     }
 
     private System.Collections.IEnumerator ShowAfterDelay(SheepGroupController responder, float delay)
     {
         yield return new WaitForSeconds(delay);
-        if (responder != null) ShowCueAt(responder.transform.position, answerAlpha);
+        if (responder != null) ShowCueAt(responder.AnswerPosition, answerAlpha);
     }
 
     /// <summary>Cue pointing at an arbitrary world position. Useful for scripted or distant answers.</summary>

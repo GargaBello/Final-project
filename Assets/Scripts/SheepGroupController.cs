@@ -37,6 +37,7 @@ public class SheepGroupController : MonoBehaviour
     /// distant answer either, otherwise "you are done here" would not read as final.
     /// </summary>
     public virtual bool CanAnswer => State != GroupState.Refusing;
+    public virtual Vector3 AnswerPosition => transform.position;
     public event Action PlayerEntered;
     public event Action PlayerExited;
 

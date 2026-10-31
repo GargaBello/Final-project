@@ -16,10 +16,20 @@ public sealed class SheepAgent : MonoBehaviour
     private Rigidbody2D body;
     private SpriteRenderer visual;
     private AudioSource voice;
+    private AudioSource rhythmVoice;
+    private AudioSource alternateRhythmVoice;
+    private bool useAlternateRhythmVoice;
     private Color originalColor;
     private Vector2 destination;
     private bool hasDestination;
+    private float destinationSpeed;
     private Coroutine feedback;
+    private Coroutine acceptingFeedback;
+    private Object flockOwner;
+    private Vector2 flockTarget;
+    private Vector2 flockVelocity;
+    private float flockSync;
+    private bool flockFacingLeft;
 
     public Vector2 HomePosition { get; private set; }
     public int ResponseCount { get; private set; }
@@ -33,6 +43,7 @@ public sealed class SheepAgent : MonoBehaviour
         originalColor = visual.color;
         HomePosition = body.position;
         destination = HomePosition;
+        destinationSpeed = moveSpeed;
         voice.pitch = Random.Range(0.94f, 1.06f);
     }
 
@@ -41,7 +52,14 @@ public sealed class SheepAgent : MonoBehaviour
     public void MoveTo(Vector2 position)
     {
         destination = position;
+        destinationSpeed = moveSpeed;
         hasDestination = true;
+    }
+
+    public void MoveTo(Vector2 position, float speed)
+    {
+        MoveTo(position);
+        destinationSpeed = Mathf.Max(0f, speed);
     }
 
     public void StopMoving()
@@ -51,6 +69,42 @@ public sealed class SheepAgent : MonoBehaviour
     }
 
     public void ReturnHome() => MoveTo(HomePosition);
+
+    public void FollowFlock(Object owner, Vector2 target, Vector2 velocity, float synchronization, bool facingLeft)
+    {
+        flockOwner = owner;
+        flockTarget = target;
+        flockVelocity = velocity;
+        flockSync = Mathf.Clamp01(synchronization);
+        flockFacingLeft = facingLeft;
+    }
+
+    public void LeaveFlockMotion(Object owner)
+    {
+        if (flockOwner != owner) return;
+        flockOwner = null;
+        StopMoving();
+    }
+
+    public void AcceptingCall(double time, float volume, Vector2 caller, bool facingLeft, bool synchronized)
+    {
+        voice.Stop();
+        FlockCallVoice.For(gameObject).Play(bleatClip, time, volume);
+        if (acceptingFeedback != null) StopCoroutine(acceptingFeedback);
+        acceptingFeedback = StartCoroutine(AcceptingFeedbackAt(time, caller, facingLeft, synchronized));
+    }
+
+    private IEnumerator AcceptingFeedbackAt(double time, Vector2 caller, bool facingLeft, bool synchronized)
+    {
+        while (AudioSettings.dspTime < time) yield return null;
+        if (synchronized) visual.flipX = facingLeft;
+        else FaceTowards(caller);
+        ResponseCount++;
+        BeatBounce.For(gameObject).PulseAt(time);
+        if (feedback != null) StopCoroutine(feedback);
+        feedback = StartCoroutine(ShowResponse(0.2f, true));
+        acceptingFeedback = null;
+    }
 
     public void FaceTowards(Vector2 position)
     {
@@ -67,6 +121,63 @@ public sealed class SheepAgent : MonoBehaviour
         feedback = StartCoroutine(ShowResponse());
     }
 
+    public void RespondRhythmTo(Vector2 caller)
+    {
+        PrepareRhythmVoice();
+        if (rhythmVoice.clip != null) rhythmVoice.Play();
+        ShowRhythmResponse(caller);
+    }
+
+    public void PrepareRhythmVoice()
+    {
+        if (rhythmVoice == null)
+        {
+            rhythmVoice = CreateRhythmVoice();
+        }
+        if (alternateRhythmVoice == null) alternateRhythmVoice = CreateRhythmVoice();
+        var clip = RhythmBleat.GetClip(bleatClip);
+        if (rhythmVoice.clip != clip) rhythmVoice.clip = clip;
+        if (alternateRhythmVoice.clip != clip) alternateRhythmVoice.clip = clip;
+        rhythmVoice.volume = voiceVolume;
+        alternateRhythmVoice.volume = voiceVolume;
+    }
+
+    private AudioSource CreateRhythmVoice()
+    {
+        var source = gameObject.AddComponent<AudioSource>();
+        source.playOnAwake = false;
+        source.loop = false;
+        source.spatialBlend = 0f;
+        source.pitch = 1f;
+        source.dopplerLevel = 0f;
+        return source;
+    }
+
+    public void ScheduleRhythm(double time)
+    {
+        PrepareRhythmVoice();
+        // Preparing a future phrase must not truncate the same sheep's current bleat.
+        var source = useAlternateRhythmVoice ? alternateRhythmVoice : rhythmVoice;
+        useAlternateRhythmVoice = !useAlternateRhythmVoice;
+        if (source.clip != null) source.PlayScheduled(time);
+    }
+
+    public void CancelRhythm()
+    {
+        if (rhythmVoice != null) rhythmVoice.Stop();
+        if (alternateRhythmVoice != null) alternateRhythmVoice.Stop();
+        useAlternateRhythmVoice = false;
+    }
+
+    public void ShowRhythmResponse(Vector2 caller)
+    {
+        BeatBounce.For(gameObject).Pulse();
+        FaceTowards(caller);
+        ResponseCount++;
+        if (feedback != null) StopCoroutine(feedback);
+        feedback = StartCoroutine(ShowResponse(0.11f));
+    }
+
     /// <summary>
     /// A quiet answer from far away: audible enough to guide the player, without the close-range
     /// flash or camera-level volume. Used when the flock is outside normal hearing range.
@@ -78,10 +189,11 @@ public sealed class SheepAgent : MonoBehaviour
         if (bleatClip != null) voice.PlayOneShot(bleatClip, voiceVolume * Mathf.Clamp01(volumeScale));
     }
 
-    private IEnumerator ShowResponse()
+    private IEnumerator ShowResponse(float duration = 0.2f, bool accepting = false)
     {
-        visual.color = new Color(1f, 0.88f, 0.55f, originalColor.a);
-        yield return new WaitForSeconds(0.2f);
+        visual.color = accepting ? new Color(1f, 0.82f, 0.42f, originalColor.a)
+            : new Color(1f, 0.88f, 0.55f, originalColor.a);
+        yield return new WaitForSeconds(duration);
         visual.color = originalColor;
         feedback = null;
     }
@@ -89,11 +201,20 @@ public sealed class SheepAgent : MonoBehaviour
     private void FixedUpdate()
     {
         Vector2 desired = Vector2.zero;
-        if (hasDestination)
+        float speedLimit = hasDestination ? destinationSpeed : moveSpeed;
+        if (flockOwner != null)
+        {
+            Vector2 error = flockTarget - body.position;
+            Vector2 correction = error.sqrMagnitude < 0.0009f ? Vector2.zero
+                : Vector2.ClampMagnitude(error * Mathf.Lerp(1.6f, 8f, flockSync), Mathf.Lerp(0.9f, 3.8f, flockSync));
+            desired = flockVelocity * flockSync + correction;
+            speedLimit = Mathf.Lerp(1f, 5f, flockSync);
+        }
+        else if (hasDestination)
         {
             Vector2 delta = destination - body.position;
             if (delta.sqrMagnitude < 0.0144f) hasDestination = false;
-            else desired = delta.normalized * Mathf.Min(moveSpeed, delta.magnitude * 3f);
+            else desired = delta.normalized * Mathf.Min(destinationSpeed, delta.magnitude * 3f);
         }
 
         Vector2 separation = Vector2.zero;
@@ -109,12 +230,18 @@ public sealed class SheepAgent : MonoBehaviour
                 separation += GetInstanceID() < other.GetInstanceID() ? Vector2.left : Vector2.right;
         }
 
-        body.linearVelocity = Vector2.ClampMagnitude(desired + separation * separationStrength, moveSpeed);
-        if (Mathf.Abs(body.linearVelocity.x) > 0.05f) visual.flipX = body.linearVelocity.x < 0f;
+        float separationAmount = flockOwner != null ? 1f - flockSync : 1f;
+        body.linearVelocity = Vector2.ClampMagnitude(desired + separation * separationStrength * separationAmount, speedLimit);
+        if (flockOwner != null && flockSync >= 0.999f) visual.flipX = flockFacingLeft;
+        else if (Mathf.Abs(body.linearVelocity.x) > 0.05f) visual.flipX = body.linearVelocity.x < 0f;
     }
 
     private void OnDisable()
     {
+        CancelRhythm();
+        flockOwner = null;
+        if (acceptingFeedback != null) StopCoroutine(acceptingFeedback);
+        acceptingFeedback = null;
         ActiveSheep.Remove(this);
         if (body != null) body.linearVelocity = Vector2.zero;
         if (feedback != null) StopCoroutine(feedback);

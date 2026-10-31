@@ -208,14 +208,15 @@ public sealed class DemandingGroup : SheepGroupController
         float distance = delta.magnitude;
         if (distance > boundaryRadius + 0.2f) lastApproachDirection = delta.normalized;
         Vector2 outward = distance > 0.05f ? delta / distance : lastApproachDirection;
-        player.SetGroupExclusion(this, center, boundaryRadius, lastApproachDirection, pushSpeed);
-
         if (distance > boundaryRadius + 2f)
         {
+            // A distant flock must not overwrite another group's ejection or movement control.
+            player.ClearGroupExclusion(this);
             if (guardsActive) foreach (var sheep in members) if (sheep != null) sheep.ReturnHome();
             guardsActive = false;
             return;
         }
+        player.SetGroupExclusion(this, center, boundaryRadius, lastApproachDirection, pushSpeed);
 
         Vector2 side = new Vector2(-outward.y, outward.x);
         Vector2 rear = center + outward * Mathf.Min(Mathf.Max(0f, distance - 0.65f), boundaryRadius - 0.55f);
