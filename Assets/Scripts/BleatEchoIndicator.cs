@@ -27,7 +27,6 @@ public sealed class BleatEchoIndicator : MonoBehaviour
 
     [Header("Opacity")]
     [SerializeField, Range(0f, 1f)] private float answerAlpha = 0.9f;
-    [SerializeField, Range(0f, 1f)] private float lonelyAlpha = 0.35f;
 
     private readonly List<SheepGroupController> runtimeGroups = new List<SheepGroupController>();
 
@@ -143,6 +142,9 @@ public sealed class BleatEchoIndicator : MonoBehaviour
         Color color = renderer.color;
         while (Time.time - start < pulseDuration)
         {
+            // The parent wave object outlives individual pulses; bail out instead of touching
+            // destroyed renderers (that used to spam MissingReferenceException).
+            if (pulse == null || renderer == null || waveSprite == null) yield break;
             float k = Mathf.Clamp01((Time.time - start - delay) / Mathf.Max(0.01f, pulseDuration - delay));
             color.a = Mathf.Lerp(alpha, 0f, k);
             renderer.color = color;

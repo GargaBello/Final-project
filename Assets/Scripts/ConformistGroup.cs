@@ -408,7 +408,7 @@ public sealed class ConformistGroup : SheepGroupController
         if (playerBleat != null) playerBleat.SetRhythmVoice(this, false);
         greetingAt = double.PositiveInfinity;
         CurrentPhase = Phase.Locked;
-        State = GroupState.Refusing;
+        ClosePermanently(); // permanent silence + dimmed look
         SetPlayerInside(false);
         foreach (var sheep in members) if (sheep != null) sheep.StopMoving();
         player.SetGroupExclusion(this, transform.position, exclusionRadius, Vector2.down, 4f);

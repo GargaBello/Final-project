@@ -20,6 +20,7 @@ public sealed class SheepAgent : MonoBehaviour
     private AudioSource alternateRhythmVoice;
     private bool useAlternateRhythmVoice;
     private Color originalColor;
+    private Color initialColor;
     private Vector2 destination;
     private bool hasDestination;
     private float destinationSpeed;
@@ -41,6 +42,7 @@ public sealed class SheepAgent : MonoBehaviour
         visual = GetComponent<SpriteRenderer>();
         voice = GetComponent<AudioSource>();
         originalColor = visual.color;
+        initialColor = visual.color;
         HomePosition = body.position;
         destination = HomePosition;
         destinationSpeed = moveSpeed;
@@ -169,6 +171,53 @@ public sealed class SheepAgent : MonoBehaviour
         useAlternateRhythmVoice = false;
     }
 
+    /// <summary>
+    /// Schedules one chorus note on the DSP clock with an explicit pitch and level. Same trimmed clip
+    /// the rhythm group uses, so the attack lands on the beat instead of the breath before it.
+    /// The visual flash waits on the same DSP time, so the eye and the ear agree.
+    /// </summary>
+    public static int ChorusNotesStarted;
+    public static int ChorusNotesDropped;
+
+    public void ScheduleChorus(double time, float pitch, float volume, Vector2 caller)
+    {
+        PrepareRhythmVoice();
+        var source = useAlternateRhythmVoice ? alternateRhythmVoice : rhythmVoice;
+        useAlternateRhythmVoice = !useAlternateRhythmVoice;
+        source.pitch = Mathf.Clamp(pitch, 0.4f, 2.2f);
+        source.volume = Mathf.Clamp01(volume);
+        if (source.clip != null)
+        {
+            source.PlayScheduled(time);
+            ChorusNotesStarted++;
+        }
+        else
+        {
+            ChorusNotesDropped++;
+        }
+        StartCoroutine(ChorusFlashAt(time, caller));
+    }
+
+    private IEnumerator ChorusFlashAt(double time, Vector2 caller)
+    {
+        while (AudioSettings.dspTime < time) yield return null;
+        BeatBounce.For(gameObject).PulseAt(time);
+        FaceTowards(caller);
+        ResponseCount++;
+        if (feedback != null) StopCoroutine(feedback);
+        // Short flash: a long glow reads as if the sound came after the light.
+        feedback = StartCoroutine(ShowResponse(0.12f));
+    }
+
+    /// <summary>
+    /// Visual half of a chorus note: the audio comes from one shared pool, but each sheep still has
+    /// to light up on its own beat.
+    /// </summary>
+    public void ScheduleChorusFlash(double time, Vector2 caller)
+    {
+        StartCoroutine(ChorusFlashAt(time, caller));
+    }
+
     public void ShowRhythmResponse(Vector2 caller)
     {
         BeatBounce.For(gameObject).Pulse();
@@ -187,6 +236,39 @@ public sealed class SheepAgent : MonoBehaviour
         FaceTowards(caller);
         ResponseCount++;
         if (bleatClip != null) voice.PlayOneShot(bleatClip, voiceVolume * Mathf.Clamp01(volumeScale));
+    }
+
+    /// <summary>
+    /// Marks this sheep as part of a flock the player can no longer join: it keeps its silhouette but
+    /// loses colour and brightness, so "closed off" is readable without a word of UI.
+    /// </summary>
+    public void SetClosed(bool closed, float brightness = 0.55f)
+    {
+        Color baseline = closed
+            ? new Color(brightness, brightness, brightness * 1.04f, originalColor.a)
+            : initialColor;
+        originalColor = baseline;
+        if (feedback != null) { StopCoroutine(feedback); feedback = null; }
+        if (acceptingFeedback != null) { StopCoroutine(acceptingFeedback); acceptingFeedback = null; }
+        if (visual != null) visual.color = baseline;
+    }
+
+    /// <summary>
+    /// One voice in the closing chorus: explicit pitch and volume so a dozen sheep can form a chord
+    /// instead of the same random bleat twelve times.
+    /// </summary>
+    public void ChorusBleat(float volume, float pitch, bool flash)
+    {
+        ResponseCount++;
+        if (bleatClip != null)
+        {
+            // Keep the original octave-safe range: anything lower turns the recorded bleat into a growl.
+            voice.pitch = Mathf.Clamp(pitch, 0.6f, 1.6f);
+            voice.PlayOneShot(bleatClip, Mathf.Clamp01(volume));
+        }
+        if (!flash) return;
+        if (feedback != null) StopCoroutine(feedback);
+        feedback = StartCoroutine(ShowResponse(0.26f));
     }
 
     private IEnumerator ShowResponse(float duration = 0.2f, bool accepting = false)

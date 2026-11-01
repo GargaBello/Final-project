@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 public sealed class PlayerBleat : MonoBehaviour
 {
     [SerializeField] private AudioClip bleatClip;
+    public AudioClip BleatClip => bleatClip;
     [SerializeField, Min(0.01f)] private float cooldown = 0.25f;
     [SerializeField, Range(0f, 1f)] private float volume = 0.6f;
     [SerializeField, Range(0f, 1f)] private float rhythmVolume = 0.16f;
@@ -31,6 +32,18 @@ public sealed class PlayerBleat : MonoBehaviour
         voice = GetComponent<AudioSource>();
         visual = GetComponent<SpriteRenderer>();
         originalColor = visual.color;
+    }
+
+    /// <summary>
+    /// Sings the player's own call at an exact DSP time for the closing chorus, using the same
+    /// trimmed clip and bounce as the shared call so the player is audibly part of the flock.
+    /// </summary>
+    public void ScheduleSungCall(double time, float level)
+    {
+        FlockCallVoice.For(gameObject).Play(bleatClip, time, Mathf.Clamp01(level));
+        BeatBounce.For(gameObject).PulseAt(time);
+        if (feedback != null) StopCoroutine(feedback);
+        feedback = StartCoroutine(ShowFeedback(time)); // ShowFeedback already waits on the DSP clock
     }
 
     private void OnEnable()

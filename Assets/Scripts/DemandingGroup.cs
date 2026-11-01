@@ -295,7 +295,7 @@ public sealed class DemandingGroup : SheepGroupController
     {
         if (!hasRequested || State == GroupState.Joined || State == GroupState.Ejecting || State == GroupState.Refusing) return State == GroupState.Refusing;
         if (RemainingFlowers != 0 || inventory == null || inventory.Count >= CurrentDemand) return false;
-        State = GroupState.Refusing;
+        ClosePermanently(); // state + dimmed "you can never join" look
         // Keep the last demand visible while the flock turns the player away: being pushed out makes
         // no sense if the "3 flowers" that caused it vanishes at the same moment.
         if (RequestSpeaker == null) RequestSpeaker = ClosestMember();

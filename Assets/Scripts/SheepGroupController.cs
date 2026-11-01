@@ -38,8 +38,29 @@ public class SheepGroupController : MonoBehaviour
     /// </summary>
     public virtual bool CanAnswer => State != GroupState.Refusing;
     public virtual Vector3 AnswerPosition => transform.position;
+
+    [Tooltip("Brightness multiplier applied to every member once the flock can never be joined again.")]
+    [SerializeField, Range(0.1f, 1f)] private float closedBrightness = 0.55f;
+
     public event Action PlayerEntered;
     public event Action PlayerExited;
+
+    /// <summary>
+    /// Closes the flock for good: permanent silence plus a dimmed look, so the player can read
+    /// "this door is shut" from across the pasture.
+    /// </summary>
+    protected void ClosePermanently()
+    {
+        if (State == GroupState.Refusing) return;
+        State = GroupState.Refusing;
+        ApplyClosedLook(true);
+    }
+
+    protected void ApplyClosedLook(bool closed)
+    {
+        foreach (var member in members)
+            if (member != null) member.SetClosed(closed, closedBrightness);
+    }
 
     protected void RecordHeardBleat() => HeardBleatCount++;
 

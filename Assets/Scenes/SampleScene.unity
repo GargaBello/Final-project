@@ -4175,7 +4175,6 @@ MonoBehaviour:
   arcScale: 0.85
   driftPerPulse: 0.3
   answerAlpha: 0.9
-  lonelyAlpha: 0.35
 --- !u!4 &396361567
 Transform:
   m_ObjectHideFlags: 0
@@ -7843,6 +7842,7 @@ MonoBehaviour:
   conformist: {fileID: 1564486653}
   accepting: {fileID: 1641263621}
   quietDelay: 2
+  unlockImmediately: 0
 --- !u!1 &921016689
 GameObject:
   m_ObjectHideFlags: 0
@@ -7918,6 +7918,7 @@ MonoBehaviour:
   approachDistance: 1.2
   firstResponseDelay: 0.8
   distantHearingRadius: 45
+  closedBrightness: 0.55
   player: {fileID: 1944459822}
   inventory: {fileID: 1944459827}
   flowers:
@@ -11026,6 +11027,82 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 4
+--- !u!1 &1455874200
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1455874202}
+  - component: {fileID: 1455874203}
+  m_Layer: 0
+  m_Name: EndingSequence
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1455874202
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1455874200}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1455874203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1455874200}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16062889976266a4fa467625b3f0513b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EndingSequence
+  bleat: {fileID: 1944459821}
+  player: {fileID: 1944459822}
+  accepting: {fileID: 1641263621}
+  view: {fileID: 712216170}
+  requireFullySynchronized: 1
+  gatherFlock: 0
+  gatherDuration: 2.2
+  gatherRadius: 2.4
+  sheepWalkSpeed: 1.4
+  gatherMaxDuration: 6
+  gatherDetectRadius: 18
+  beatDuration: 0.6
+  chorusLead: 0.15
+  accentDownbeat: 0.34
+  accentOnBeat: 0.28
+  accentOffBeat: 0.22
+  bars:
+  - groove: 0,1,2.5,3.5
+    volume: 1
+  - groove: 0.5,1,2.5,3
+    volume: 1.05
+  - groove: 0,0.5,1.5,3.5
+    volume: 1.1
+  - groove: 0,1.5,2.5,3.5
+    volume: 1.1
+  zoomDuration: 3.5
+  zoomPadding: 1.35
+  zoomMaxSize: 16
+  textDelayAfterChorus: 1.6
+  textFadeDuration: 1.2
+  holdAfterLine: 4
+  fadeOutDuration: 1.8
 --- !u!1 &1524062500
 GameObject:
   m_ObjectHideFlags: 0
@@ -11385,6 +11462,7 @@ MonoBehaviour:
   approachDistance: 1.2
   firstResponseDelay: 0.3
   distantHearingRadius: 45
+  closedBrightness: 0.55
   player: {fileID: 1944459822}
   vacantSlot: {x: 2.1, y: -1.7}
   slotRadius: 0.85
@@ -19265,8 +19343,10 @@ MonoBehaviour:
   approachDistance: 1.2
   firstResponseDelay: 0.3
   distantHearingRadius: 100
+  closedBrightness: 0.55
   player: {fileID: 1944459822}
   chorusVolume: 0.4
+  playerCallVolume: 0.55
 --- !u!1 &1681143592
 GameObject:
   m_ObjectHideFlags: 0
@@ -120512,6 +120592,7 @@ MonoBehaviour:
   approachDistance: 1.2
   firstResponseDelay: 0.8
   distantHearingRadius: 45
+  closedBrightness: 0.55
   player: {fileID: 1944459820}
   responsiveSheep:
   - {fileID: 45471440}
@@ -122826,3 +122907,4 @@ SceneRoots:
   - {fileID: 685703742}
   - {fileID: 1164682551}
   - {fileID: 396361567}
+  - {fileID: 1455874202}

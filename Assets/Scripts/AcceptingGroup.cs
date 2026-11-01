@@ -14,6 +14,8 @@ public sealed class AcceptingGroup : SheepGroupController
     };
     [SerializeField] private PlayerController player;
     [SerializeField, Range(0f, 1f)] private float chorusVolume = 0.4f;
+    [Tooltip("Level of the player's own call during a shared call. Kept near a normal call so the flock's answer is a reply, not a whisper.")]
+    [SerializeField, Range(0f, 1f)] private float playerCallVolume = 0.55f;
     private readonly List<SheepAgent> responders = new List<SheepAgent>();
     private Vector2[] looseOffsets;
     private Vector2 center;
@@ -67,15 +69,18 @@ public sealed class AcceptingGroup : SheepGroupController
         responders.Sort((a, b) => ((Vector2)a.transform.position - position).sqrMagnitude.CompareTo(
             ((Vector2)b.transform.position - position).sqrMagnitude));
         int count = Mathf.Min(responders.Count, Mathf.RoundToInt(Mathf.Lerp(3, responders.Count, (SharedCalls - 1) / 5f)));
-        float volume = chorusVolume / (count + 1);
+        // Per-voice level has to stay audible: the old chorusVolume / (count + 1) made the first
+        // answer 0.10 and the last one 0.03, i.e. the flock whispered while the player shouted.
+        float perVoice = Mathf.Clamp(chorusVolume / Mathf.Sqrt(count + 1f), 0.10f, 0.30f);
         double delay = ResponseDelays[SharedCalls - 1];
         bool left = player.GetComponent<SpriteRenderer>().flipX;
         for (int i = 0; i < count; i++)
         {
             double stagger = FullySynchronized ? 0 : i * 0.035 * (1f - SharedCalls / 6f);
-            responders[i].AcceptingCall(sharedTime + delay + stagger, volume, position, left, FullySynchronized);
+            responders[i].AcceptingCall(sharedTime + delay + stagger, perVoice, position, left, FullySynchronized);
         }
-        return volume;
+        // The player keeps their normal call level; only the flock needs the crowd maths.
+        return playerCallVolume;
     }
 
     public override void HearBleat(Transform caller)

@@ -414,8 +414,14 @@ public sealed class DividedGroup : SheepGroupController
     {
         CurrentPhase = phase;
         phaseStarted = Time.time;
-        State = phase == Phase.Silent ? GroupState.Refusing
-            : phase == Phase.Idle ? GroupState.Idle
+        if (phase == Phase.Silent)
+        {
+            // Everyone has drifted back to the big flock: same closed treatment as the other groups,
+            // otherwise this one keeps its colour and reads as still joinable.
+            ClosePermanently();
+            return;
+        }
+        State = phase == Phase.Idle ? GroupState.Idle
             : phase == Phase.PartialResponse ? GroupState.Responding : GroupState.Together;
     }
 
