@@ -27,6 +27,9 @@ public sealed class AcceptanceProgression : MonoBehaviour
         unlocked = true;
     }
 
+    // Hidden pause-menu shortcut: reveal the flock without changing the normal rejection gates.
+    public void UnlockForTesting() => UnlockNow();
+
     private void Update()
     {
         if (unlocked || demanding == null || divided == null || conformist == null || accepting == null) return;

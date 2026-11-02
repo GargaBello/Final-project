@@ -31,6 +31,7 @@ public sealed class SheepAgent : MonoBehaviour
     private Vector2 flockVelocity;
     private float flockSync;
     private bool flockFacingLeft;
+    private bool movementFrozen;
 
     public Vector2 HomePosition { get; private set; }
     public int ResponseCount { get; private set; }
@@ -68,6 +69,12 @@ public sealed class SheepAgent : MonoBehaviour
     {
         hasDestination = false;
         if (body != null) body.linearVelocity = Vector2.zero;
+    }
+
+    public void SetMovementFrozen(bool frozen)
+    {
+        movementFrozen = frozen;
+        if (frozen) StopMoving();
     }
 
     public void ReturnHome() => MoveTo(HomePosition);
@@ -282,6 +289,11 @@ public sealed class SheepAgent : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (movementFrozen)
+        {
+            body.linearVelocity = Vector2.zero;
+            return;
+        }
         Vector2 desired = Vector2.zero;
         float speedLimit = hasDestination ? destinationSpeed : moveSpeed;
         if (flockOwner != null)
@@ -322,6 +334,7 @@ public sealed class SheepAgent : MonoBehaviour
     {
         CancelRhythm();
         flockOwner = null;
+        movementFrozen = false;
         if (acceptingFeedback != null) StopCoroutine(acceptingFeedback);
         acceptingFeedback = null;
         ActiveSheep.Remove(this);

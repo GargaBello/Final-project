@@ -42,8 +42,15 @@ public sealed class PlayerBleat : MonoBehaviour
     {
         FlockCallVoice.For(gameObject).Play(bleatClip, time, Mathf.Clamp01(level));
         BeatBounce.For(gameObject).PulseAt(time);
-        if (feedback != null) StopCoroutine(feedback);
-        feedback = StartCoroutine(ShowFeedback(time)); // ShowFeedback already waits on the DSP clock
+        StartCoroutine(ShowSungFeedbackAt(time));
+    }
+
+    private IEnumerator ShowSungFeedbackAt(double time)
+    {
+        while (AudioSettings.dspTime < time) yield return null;
+        visual.color = new Color(1f, 0.82f, 0.42f, originalColor.a);
+        yield return new WaitForSeconds(0.12f);
+        visual.color = originalColor;
     }
 
     private void OnEnable()

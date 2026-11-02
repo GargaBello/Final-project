@@ -141,8 +141,9 @@ public sealed class EndingSequence : MonoBehaviour
         if (follow != null) follow.enabled = false;
 
         CollectCast();
-        FreezeFlock();
+        if (accepting != null) accepting.StopFollowingForEnding();
         if (gatherFlock) GatherAroundPlayer();
+        else FreezeFlock();
 
         float beat = Mathf.Max(0.15f, beatDuration);
         float chorusStart = gatherFlock ? Mathf.Clamp(gatherTravelTime, gatherDuration, gatherMaxDuration) : 0f;
@@ -163,6 +164,7 @@ public sealed class EndingSequence : MonoBehaviour
 
             if (!chorusQueued && t >= chorusStart)
             {
+                if (gatherFlock) FreezeFlock();
                 chorusQueued = true;
                 QueueChorus(beat, chorusStart - t);
             }
@@ -241,7 +243,7 @@ public sealed class EndingSequence : MonoBehaviour
         for (int i = 0; i < cast.Count; i++)
         {
             if (cast[i] == null) continue;
-            cast[i].StopMoving();
+            cast[i].SetMovementFrozen(true);
             var body = cast[i].GetComponent<Rigidbody2D>();
             if (body != null) body.linearVelocity = Vector2.zero;
         }

@@ -25,6 +25,7 @@ public sealed class AcceptingGroup : SheepGroupController
     private bool hasJoined;
     private bool collisionsIgnored;
     private bool hasShownCallHint;
+    private bool endingFrozen;
     private float callHintUntil;
     private GUIStyle callHintStyle;
 
@@ -49,6 +50,17 @@ public sealed class AcceptingGroup : SheepGroupController
     {
         IsUnlocked = true;
         State = GroupState.Idle;
+    }
+
+    public void StopFollowingForEnding()
+    {
+        endingFrozen = true;
+        if (members != null)
+            foreach (var sheep in members)
+                if (sheep != null)
+                {
+                    sheep.LeaveFlockMotion(this);
+                }
     }
 
     // PlayerBleat reserves one shared audio time before either the player or flock plays.
@@ -168,7 +180,7 @@ public sealed class AcceptingGroup : SheepGroupController
 
     private void FixedUpdate()
     {
-        if (!IsUnlocked || player == null || !hasJoined) return;
+        if (!IsUnlocked || player == null || !hasJoined || endingFrozen) return;
         if (DistanceTo(player.PhysicsPosition) > hearingRadius + 1f)
         {
             foreach (var sheep in members) if (sheep != null) sheep.LeaveFlockMotion(this);
